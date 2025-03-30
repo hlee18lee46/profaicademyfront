@@ -21,6 +21,7 @@ export default function Chatbot() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,  // ✅ Add this line
         },
         body: JSON.stringify({ message: userMsg }),
       });
