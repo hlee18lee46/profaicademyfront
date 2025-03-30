@@ -49,7 +49,7 @@ export default function Chatbot() {
 
   return (
     <div className="p-4 bg-white rounded-xl shadow-md h-full flex flex-col">
-      <h2 className="text-lg font-bold mb-2">💬 Gemini Chatbot</h2>
+      <h2 className="text-lg font-bold mb-2">💬 Ask Prof-AI!</h2>
       <div className="flex-1 overflow-y-auto space-y-2 mb-2 text-sm whitespace-pre-wrap">
         {messages.map((msg, i) => (
           <div key={i}>

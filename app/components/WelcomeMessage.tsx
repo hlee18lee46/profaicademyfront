@@ -9,50 +9,52 @@ interface Profile {
 }
 
 interface Course {
-    canvas_course_id: number;
-    name: string;
-    course_code: string;
-    start_at?: string;
-    end_at?: string;
-    time_zone?: string;
-  }
+  canvas_course_id: number;
+  name: string;
+  course_code: string;
+  start_at?: string;
+  end_at?: string;
+  time_zone?: string;
+}
+
+interface Assignment {
+  name: string;
+  due_at?: string;
+  points_possible?: number;
+  grade?: string;
+}
 
 export default function WelcomeMessage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCourse, setExpandedCourse] = useState<number | null>(null);
+  const [assignments, setAssignments] = useState<Record<number, Assignment[]>>({});
 
-  // ⏰ Helper to get course status
   const getCourseStatus = (start_at?: string, end_at?: string): string => {
     const now = new Date();
-  
     const start = start_at ? new Date(start_at) : null;
     const end = end_at ? new Date(end_at) : null;
-  
     if (start && now < start) return "Upcoming";
     if (end && now > end) return "Past";
-    if (start || end) return "Current"; // at least one exists, assume ongoing
-    return "Unknown"; // neither date exists
+    if (start || end) return "Current";
+    return "Unknown";
   };
-  
 
   useEffect(() => {
-    const fetchProfileAndCourses = async () => {
+    const fetchData = async () => {
       try {
         const token = localStorage.getItem("token");
-
-        // ✅ Fetch Profile
         const profileRes = await axios.get("https://eduprogressbackend.onrender.com/profile", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setProfile(profileRes.data);
 
-        // ✅ Fetch Courses
-        const savedCourses = await axios.get("https://eduprogressbackend.onrender.com/courses", {
+        const courseRes = await axios.get("https://eduprogressbackend.onrender.com/courses", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setCourses(savedCourses.data);
+        setCourses(courseRes.data);
       } catch (err: any) {
         setError("Failed to load profile or courses.");
         console.error(err);
@@ -61,21 +63,29 @@ export default function WelcomeMessage() {
       }
     };
 
-    fetchProfileAndCourses();
+    fetchData();
   }, []);
 
-  const fetchAssignments = async (courseId: number) => {
+  const toggleCourse = async (courseId: number) => {
     const token = localStorage.getItem("token");
-    try {
-      const res = await axios.get(
-        `https://eduprogressbackend.onrender.com/canvas/courses/${courseId}/assignments/save`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
+
+    if (expandedCourse === courseId) {
+      setExpandedCourse(null); // collapse
+    } else {
+      setExpandedCourse(courseId); // expand
+
+      // Only fetch if not already fetched
+      if (!assignments[courseId]) {
+        try {
+          const res = await axios.get(
+            `https://eduprogressbackend.onrender.com/canvas/courses/${courseId}/assignments/save`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          setAssignments((prev) => ({ ...prev, [courseId]: res.data.assignments || [] }));
+        } catch (err) {
+          console.error(`❌ Failed to fetch assignments for course ${courseId}`, err);
         }
-      );
-      console.log(`✅ Assignments saved for course ${courseId}:`, res.data);
-    } catch (err) {
-      console.error(`❌ Failed to fetch assignments for course ${courseId}:`, err);
+      }
     }
   };
 
@@ -101,28 +111,54 @@ export default function WelcomeMessage() {
             {courses.map((course, index) => {
               const status = getCourseStatus(course.start_at, course.end_at);
               const statusColor =
-              status === "Current"
-                ? "bg-green-100 text-green-700"
-                : status === "Upcoming"
-                ? "bg-yellow-100 text-yellow-700"
-                : status === "Past"
-                ? "bg-gray-300 text-gray-700"
-                : "bg-red-100 text-red-700"; // for "Unknown"
-            
+                status === "Current"
+                  ? "bg-green-100 text-green-700"
+                  : status === "Upcoming"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : status === "Past"
+                  ? "bg-gray-300 text-gray-700"
+                  : "bg-red-100 text-red-700";
+
+              const isExpanded = expandedCourse === course.canvas_course_id;
 
               return (
-<li
-  key={index}
-  onClick={() => fetchAssignments(course.canvas_course_id)}
-  className="bg-blue-50 p-3 rounded-xl flex justify-between items-center shadow-sm cursor-pointer hover:bg-blue-100"
->
-                  <div>
-                    <p className="font-medium text-blue-800">{course.name}</p>
-                    <p className="text-sm text-gray-600">{course.course_code}</p>
+                <li key={index} className="bg-blue-50 rounded-xl shadow-sm">
+                  <div
+                    onClick={() => toggleCourse(course.canvas_course_id)}
+                    className="p-3 flex justify-between items-center cursor-pointer hover:bg-blue-100 rounded-t-xl"
+                  >
+                    <div>
+                      <p className="font-medium text-blue-800">{course.name}</p>
+                      <p className="text-sm text-gray-600">{course.course_code}</p>
+                    </div>
+                    <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusColor}`}>
+                      {status}
+                    </span>
                   </div>
-                  <span className={`text-xs font-semibold px-3 py-1 rounded-full ${statusColor}`}>
-                    {status}
-                  </span>
+
+                  {/* Assignments Dropdown */}
+                  {isExpanded && assignments[course.canvas_course_id] && (
+                    <div className="bg-white px-4 pb-3 pt-2 space-y-2 text-sm rounded-b-xl border-t">
+                      {assignments[course.canvas_course_id].length === 0 ? (
+                        <p className="text-gray-500 italic">No assignments found.</p>
+                      ) : (
+                        assignments[course.canvas_course_id].map((a, i) => (
+                          <div key={i} className="border p-2 rounded bg-gray-50">
+                            <p className="font-medium">{a.name}</p>
+                            {a.due_at && (
+                              <p className="text-xs text-gray-600">Due: {new Date(a.due_at).toLocaleString()}</p>
+                            )}
+                            {a.points_possible !== undefined && (
+                              <p className="text-xs text-gray-600">Points: {a.points_possible}</p>
+                            )}
+                            {a.grade && (
+                              <p className="text-xs text-blue-600 font-semibold">Grade: {a.grade}</p>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </li>
               );
             })}
