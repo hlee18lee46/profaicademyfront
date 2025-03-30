@@ -9,12 +9,13 @@ interface Profile {
 }
 
 interface Course {
-  name: string;
-  course_code: string;
-  start_at?: string;
-  end_at?: string;
-  time_zone?: string;
-}
+    canvas_course_id: number;
+    name: string;
+    course_code: string;
+    start_at?: string;
+    end_at?: string;
+    time_zone?: string;
+  }
 
 export default function WelcomeMessage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -63,6 +64,21 @@ export default function WelcomeMessage() {
     fetchProfileAndCourses();
   }, []);
 
+  const fetchAssignments = async (courseId: number) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await axios.get(
+        `https://eduprogressbackend.onrender.com/canvas/courses/${courseId}/assignments/save`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      console.log(`✅ Assignments saved for course ${courseId}:`, res.data);
+    } catch (err) {
+      console.error(`❌ Failed to fetch assignments for course ${courseId}:`, err);
+    }
+  };
+
   return (
     <div className="p-4 bg-white rounded-2xl shadow-md h-full overflow-auto">
       <h1 className="text-2xl font-bold mb-4">🎉 Welcome to ProfAIcademy!</h1>
@@ -95,10 +111,11 @@ export default function WelcomeMessage() {
             
 
               return (
-                <li
-                  key={index}
-                  className="bg-blue-50 p-3 rounded-xl flex justify-between items-center shadow-sm"
-                >
+<li
+  key={index}
+  onClick={() => fetchAssignments(course.canvas_course_id)}
+  className="bg-blue-50 p-3 rounded-xl flex justify-between items-center shadow-sm cursor-pointer hover:bg-blue-100"
+>
                   <div>
                     <p className="font-medium text-blue-800">{course.name}</p>
                     <p className="text-sm text-gray-600">{course.course_code}</p>
